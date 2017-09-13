@@ -1,0 +1,38 @@
+* {
+  margin: 0;
+  padding: 0;
+}
+
+body, html {
+  height: 100%;
+  overflow: hidden;
+}
+
+.links {
+  stroke: #FFF;
+  stroke-opacity: 0.2;
+}
+
+.polygons {
+  fill: none;
+  stroke: #FFF;
+  stroke-opacity: 0.2;
+}
+
+.polygons :first-child {
+  fill: #D3D3D3;
+}
+
+.sites {
+  fill: #fff;
+  stroke: #fff;
+}
+
+.sites :first-child {
+  fill: #fff;
+}
+
+.active {
+  fill-opacity: 0.4;
+  stroke-opacity: 0.4;
+}
