@@ -1,7 +1,7 @@
 // variables...................................................................
 var svg = d3.select("svg"), voronoi,
-          points, sites, polygon, link,
-          site, defaultTheme, changeColor = false;
+          points, sites, polygon, link, site,
+          timer, defaultTheme, changeColor = false;
 
 var params = {
   points: 6,
@@ -31,7 +31,9 @@ newVoronoi();
 // type and size functions.....................................................
 function typeChanged(value){
   var circles = d3.selectAll("circle");
-
+  
+  if(timer)
+    timer.stop();
   svg.on("touchmove mousemove", null);
 
   if(value == "drag and drop"){
@@ -71,15 +73,12 @@ function resized(){
   sites = points
     .map(function(d) { return [d[0] * width, d[1] * height]; });
 
-  console.log(d3.selectAll("circle").data());
   redraw();
 }
 
 // trip functions..............................................................
 function trip(){
-  //svg.selectAll("*").remove();
-
-  d3.timer(function(elapsed){
+  timer = d3.timer(function(elapsed){
     var circles = svg.selectAll("circle");
     sites = [];
 
@@ -103,8 +102,6 @@ function trip(){
 
     redraw();
   });
-
-  //redraw();
 }
 
 // diagram function............................................................
