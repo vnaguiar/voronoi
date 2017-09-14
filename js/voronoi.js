@@ -34,6 +34,7 @@ function typeChanged(value){
   
   if(timer)
     timer.stop();
+  circles.on("onclick", null);  
   svg.on("touchmove mousemove", null);
 
   if(value == "drag and drop"){
@@ -49,8 +50,10 @@ function typeChanged(value){
           .on("drag", null)
           .on("end", null));
     if(value == "diagram"){
+      console.log("type");
       svg.on("touchmove mousemove", moved);
-      circles.transition().attr("r", 3);
+      circles.on("click", clicked)
+             .transition().attr("r", 3);
     }
     else if(value == "trip"){
       circles.transition().attr("r", 6);
@@ -86,7 +89,7 @@ function trip(){
       var circle = d3.select(this),
           speedx = parseFloat(circle.attr("speedx")),
           speedy = parseFloat(circle.attr("speedy")),
-          cx = parseFloat(circle.attr("cx")) + speedx;
+          cx = parseFloat(circle.attr("cx")) + speedx,
           cy = parseFloat(circle.attr("cy")) + speedy;
 
       if(cx <= 0 || cx >= svg.attr("width"))
@@ -107,6 +110,21 @@ function trip(){
 // diagram function............................................................
 function moved(){
   sites[0] = d3.mouse(this);
+  redraw();
+}
+
+function clicked(){
+  souris = d3.mouse(this);
+  sites.push(souris);
+
+  svg.select(".sites")
+      .append("circle")
+      .attr("r", 3)
+      .attr("cx", souris[0])
+      .attr("cy", souris[1])
+      .attr("speedx", 6*Math.random())
+      .attr("speedy", 6*Math.random());
+
   redraw();
 }
 
@@ -143,9 +161,7 @@ function dragended(){
 // essential functions.........................................................
 function newVoronoi(){
   var width = window.innerWidth,
-		  height = window.innerHeight,
-      radius = params.type == "diagram" ? 3: 
-              (params.type == "trip" ? 6 : 10);
+		  height = window.innerHeight;
 
   svg.attr("width", width)
      .attr("height", height);
@@ -180,7 +196,7 @@ function newVoronoi(){
 	  .selectAll("circle")
 	  .data(sites)
 	  .enter().append("circle")
-	    .attr("r", radius)
+	    .attr("r", 3)
       .each(function(){
         d3.select(this)
           .attr("speedx", 6*Math.random())
@@ -211,7 +227,7 @@ function smoothColors(){
   
   d3.selectAll("path").each(function(){
     color = Math.floor(Math.random() * 5);
-    d3.select(this).transition().style("fill", palette[theme][color]);
+    d3.select(this).transition().attr("fill", palette[theme][color]);
   });
 
   changeColor = false;
