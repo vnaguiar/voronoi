@@ -16,7 +16,7 @@ var params = {
 var gui = new dat.GUI(),
     typeControl = gui.add(params, "type",
       ["trip", "diagram", "drag and drop"]),
-    pointsControl = gui.add(params, "points").min(1).max(64).step(1);
+    pointsControl = gui.add(params, "points").min(1).max(42).step(1);
  gui.add(params, "smoothness");
  gui.add(params, "colorfulness");
 
@@ -84,17 +84,17 @@ function trip(){
 
     circles.each(function(){
       var circle = d3.select(this),
-          speedx = parseFloat(circle.attr("speed.x")),
-          speedy = parseFloat(circle.attr("speed.y")),
+          speedx = parseFloat(circle.attr("speedx")),
+          speedy = parseFloat(circle.attr("speedy")),
           cx = parseFloat(circle.attr("cx")) + speedx;
           cy = parseFloat(circle.attr("cy")) + speedy;
 
       if(cx <= 0 || cx >= svg.attr("width"))
-        circle.attr("speed.x", -1*speedx);
+        circle.attr("speedx", -1*speedx);
       circle.attr("cx", cx);
 
       if(cy <= 0 || cy >= svg.attr("height"))
-        circle.attr("speed.y", -1*speedy);
+        circle.attr("speedy", -1*speedy);
       circle.attr("cy", cy);
 
       sites.push([circle.attr("cx"), circle.attr("cy")]);
@@ -181,8 +181,11 @@ function newVoronoi(){
 	  .data(sites)
 	  .enter().append("circle")
 	    .attr("r", radius)
-      .attr("speed.x", 3*Math.random())
-      .attr("speed.y", 3*Math.random())
+      .each(function(){
+        d3.select(this)
+          .attr("speedx", 6*Math.random())
+          .attr("speedy", 6*Math.random());
+      })
 	    .call(redrawSite);
   
   typeChanged(params.type);
