@@ -210,13 +210,7 @@ function newVoronoi(){
 }
 
 function smoothColors(){
-  var theme, color, palette = [
-    ["#412b32","#574b66","#8d8a78","#ab9f83","#ead6c8"],  //random
-    ["#828DB5","#3B3A71","#1F1E38","#5769AE","#BEA996"],  //star light
-    ["#1B2310","#6A7669","#909A97","#B3ABAC","#87878E"],  //game of thrones
-    ["#3F413A","#515A64","#78A8B1","#9BAEB6","#D6C1A4"],  //the lego movie
-    ["#424937","#384037","#8B2F2A","#877D14","#E1B154"]   //paper mario
-  ];
+  var theme, color;
 
   if(changeColor || defaultTheme == undefined){
     theme = Math.floor(Math.random() * palette.length);
