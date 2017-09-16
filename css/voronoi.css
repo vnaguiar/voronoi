@@ -19,10 +19,6 @@ body, html {
   stroke-opacity: 0.2;
 }
 
-.polygons :first-child {
-  fill: #D3D3D3;
-}
-
 .sites {
   fill: #fff;
   stroke: #fff;

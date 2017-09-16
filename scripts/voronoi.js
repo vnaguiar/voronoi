@@ -1,67 +1,52 @@
-// variables...................................................................
-var svg = d3.select("svg"), voronoi,
-          points, sites, polygon, link, site,
-          timer, defaultTheme, changeColor = false;
+// global variables, event listeners and initial state.........................
 
+var gui = new dat.GUI(), typeGUI, pointsGUI;
 var params = {
-  points: 6,
-  type: "trip",
-  smoothness: smoothBorders,
-  colorfulness: function(){
-    changeColor = true;
-    smoothColors();
-  }
+	points: 6,
+	type: "diagram",
+	borders: smoothBorders,
+	toggleMovement: moveSites,
+	shiftColor: function(){palleteChanged(true);}
 };
 
-var gui = new dat.GUI(),
-    typeControl = gui.add(params, "type",
-      ["trip", "diagram", "drag and drop"]),
-    pointsControl = gui.add(params, "points").min(1).max(42).step(1);
- gui.add(params, "smoothness");
- gui.add(params, "colorfulness");
+var svg = d3.select("svg"), voronoi, points, 
+		sites, polygon, link, site, timer, defaultTheme;
 
-// event listeners.............................................................
+typeGUI = gui.add(params, "type", ["diagram", "drag and drop"]);
+pointsGUI = gui.add(params, "points").min(2).max(42).step(1);
+gui.add(params, "shiftColor");
+gui.add(params, "toggleMovement");
+
 window.onresize = resized;
-typeControl.onFinishChange(typeChanged);
-pointsControl.onFinishChange(newVoronoi);
+typeGUI.onFinishChange(typeChanged);
+pointsGUI.onFinishChange(function(){newVoronoi(false);});
 
-// initial state...............................................................
-newVoronoi();
+newVoronoi(true);
 
-// type and size functions.....................................................
-function typeChanged(value){
-  var circles = d3.selectAll("circle");
-  
-  if(timer)
-    timer.stop();
-  circles.on("onclick", null);  
-  svg.on("touchmove mousemove", null);
+// type function...............................................................
+function typeChanged(type){
+  var circles = svg.selectAll("circle");
 
-  if(value == "drag and drop"){
-    circles.call(d3.drag()
+	if(type == "diagram"){
+		circles.call(d3.drag()
+          .on("start", null)
+          .on("drag", null)
+          .on("end", null))
+          .on("click", clicked)
+          .transition().attr("r", 3);
+		svg.on("touchmove mousemove", moved);
+  }
+  else {
+  	svg.on("touchmove mousemove", null);
+  	circles.call(d3.drag()
           .on("start", dragstarted)
           .on("drag", dragged)
           .on("end", dragended))
           .transition().attr("r", 10);
   }
-  else {
-    circles.call(d3.drag()
-          .on("start", null)
-          .on("drag", null)
-          .on("end", null));
-    if(value == "diagram"){
-      console.log("type");
-      svg.on("touchmove mousemove", moved);
-      circles.on("click", clicked)
-             .transition().attr("r", 3);
-    }
-    else if(value == "trip"){
-      circles.transition().attr("r", 6);
-      trip();
-    }
-  }
 }
 
+// resize function.............................................................
 function resized(){
   var width = window.innerWidth,
       height = window.innerHeight;
@@ -77,34 +62,6 @@ function resized(){
     .map(function(d) { return [d[0] * width, d[1] * height]; });
 
   redraw();
-}
-
-// trip functions..............................................................
-function trip(){
-  timer = d3.timer(function(elapsed){
-    var circles = svg.selectAll("circle");
-    sites = [];
-
-    circles.each(function(){
-      var circle = d3.select(this),
-          speedx = parseFloat(circle.attr("speedx")),
-          speedy = parseFloat(circle.attr("speedy")),
-          cx = parseFloat(circle.attr("cx")) + speedx,
-          cy = parseFloat(circle.attr("cy")) + speedy;
-
-      if(cx <= 0 || cx >= svg.attr("width"))
-        circle.attr("speedx", -1*speedx);
-      circle.attr("cx", cx);
-
-      if(cy <= 0 || cy >= svg.attr("height"))
-        circle.attr("speedy", -1*speedy);
-      circle.attr("cy", cy);
-
-      sites.push([circle.attr("cx"), circle.attr("cy")]);
-    });
-
-    redraw();
-  });
 }
 
 // diagram function............................................................
@@ -158,8 +115,68 @@ function dragended(){
   d3.select(this).classed("active", false);
 }
 
-// essential functions.........................................................
-function newVoronoi(){
+// palette functions...........................................................
+function palleteChanged(changeColor){
+  var theme, color;
+
+  if(changeColor || defaultTheme == undefined){
+    theme = Math.floor(Math.random() * palette.length);
+    defaultTheme = theme;
+  }
+  else
+    theme = defaultTheme;
+  
+  d3.selectAll("path").each(function(){
+    color = Math.floor(Math.random() * 5);
+    d3.select(this).transition().attr("fill", palette[theme][color]);
+  });
+
+  changeColor = false;
+}
+
+
+// border functions............................................................
+function smoothBorders(){}
+
+// movement functions..........................................................
+function moveSites(){
+	if(timer){
+    timer.stop();
+    timer = null;
+  }
+	else{
+		timer = d3.timer(function(elapsed){
+			var circles = svg.selectAll("circle");
+			sites = [];
+
+			circles.each(function(){
+				var circle = d3.select(this),				
+						cx = parseFloat(circle.attr("cx")),
+						cy = parseFloat(circle.attr("cy")),
+						speedx = parseFloat(circle.attr("speedx")),
+						speedy = parseFloat(circle.attr("speedy"));
+				
+				if(circle.attr("id") != "mouse" || params.type != "diagram"){
+					cx = cx + speedx;
+					cy = cy + speedy;
+					
+					if(cx <= 0 || cx >= svg.attr("width"))
+						circle.attr("speedx", -1*speedx);
+
+					if(cy <= 0 || cy >= svg.attr("height"))
+						circle.attr("speedy", -1*speedy);
+				}
+				
+				sites.push([cx, cy]);
+			});
+
+			redraw();
+		});
+	}
+}
+
+// redraw functions............................................................
+function newVoronoi(changeColor){
   var width = window.innerWidth,
 		  height = window.innerHeight;
 
@@ -203,32 +220,15 @@ function newVoronoi(){
           .attr("speedy", 6*Math.random());
       })
 	    .call(redrawSite);
+
+	svg.select("circle")
+		.attr("id", "diagramSite");
+	svg.select("path")
+		.attr("id", "diagramPolygon");
   
-  typeChanged(params.type);
-  smoothColors();
-  redraw();
-}
-
-function smoothColors(){
-  var theme, color;
-
-  if(changeColor || defaultTheme == undefined){
-    theme = Math.floor(Math.random() * palette.length);
-    defaultTheme = theme;
-  }
-  else
-    theme = defaultTheme;
-  
-  d3.selectAll("path").each(function(){
-    color = Math.floor(Math.random() * 5);
-    d3.select(this).transition().attr("fill", palette[theme][color]);
-  });
-
-  changeColor = false;
-}
-
-function smoothBorders(){
-
+	palleteChanged(changeColor);
+	typeChanged(params.type);
+	redraw();
 }
 
 function redraw(){
