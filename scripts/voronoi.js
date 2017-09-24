@@ -1,68 +1,69 @@
 // global variables, event listeners and initial state.........................
 
 var gui = new dat.GUI(),
-		typeGUI, pointsGUI, params = {
-			points: 6,
-			type: "diagram",
-			shiftBorder: borderShifted,
-			toggleMovement: sitesShifted,
-			shiftColor: function() {palleteShifted(true);}
-		};
+	typeGui, pointsGui, params = {
+		points: 4,
+		type: "trip",
+		shiftBorder: shiftBorder,
+		shiftColor: function() {shiftPallete(true);}
+	};
 
-var line = d3.line()
-			.x(function(d) { return d[0]; })
-			.y(function(d) { return d[1]; }),
-		svg = d3.select("svg"), start = Date.now(), voronoi,
-		points = [], sites, polygon, link, site, movementTimer, border = 0, 
-		defaultTheme, interpolateTypes = 
-			[d3.curveLinear, d3.curveBasisClosed, d3.curveCardinalClosed];
+var svg = d3.select("svg"), voronoi, points, sites, polygonsDom, 
+	linksDom, sitesDom, border = 0, theme = 0, wasTrip = true, timer,
 
-typeGUI = gui.add(params, "type", ["diagram", "drag and drop"]);
+	line = d3.line()
+		.x(function(d) { return d[0]; })
+		.y(function(d) { return d[1]; }),
+
+	curveTypes = 
+		[d3.curveLinear, d3.curveBasisClosed,
+		 d3.curveCardinalClosed, d3.curveCatmullRomClosed];
+
+typeGui = gui.add(params, "type", ["trip", "diagram", "drag and drop"]);
+typeGui.onFinishChange(shiftType);
 gui.add(params, "shiftColor");
 gui.add(params, "shiftBorder");
-movementGUI = gui.add(params, "toggleMovement");
-pointsGUI = gui.add(params, "points").min(2).max(42).step(1);
 
-window.onresize = resized;
-typeGUI.onFinishChange(typeShifted);
-pointsGUI.onFinishChange(function() {newDiagram(false);});
+newGoodTrip();
 
-typeShifted(params.type);
-borderShifted();
+// event functions.............................................................
 
-// type function...............................................................
-function typeShifted(type){
-	var circles = svg.selectAll("circle");
-
-	circles.call(d3.drag()
-					.on("start", null)
-					.on("drag", null)
-					.on("end", null))
-					.transition().attr("r", 3);
+function shiftType(){
 	svg.on("touchmove mousemove", null);
+	svg.selectAll("circle").call(d3.drag()
+			.on("start", null)
+			.on("drag", null)
+			.on("end", null));
 
-	if(type == "trip"){
-		movementGUI.remove();
-		movementGUI  =  null;
-		pointsGUI.remove();
-		pointsGUI = null;
+	if(params.type == "trip"){
+		if(pointsGui){
+			pointsGui.remove();
+			pointsGui = null;
+		}
+
+		svg.selectAll("*").remove();
+		window.onresize = null;
+		wasTrip = true;
+
 		newGoodTrip();
 	}
 	else {
-		if(svg.selectAll("*").node() == null)
-			newDiagram(true);
-
-		if(movementGUI == null){
-			newDiagram(true);
-			movementGUI = gui.add(params, "toggleMovement");
-			pointsGUI = gui.add(params, "points").min(2).max(42).step(1);
-			pointsGUI.onFinishChange(function() {newDiagram(false);});
+		if(wasTrip){
+			pointsGui = gui.add(params, "points").min(2).max(42).step(1);
+			pointsGui.onChange(updateDiagram);
+			window.onresize = updateDiagram;
+			svg.selectAll("*").remove();
+			wasTrip = false;
+			timer.stop();
+			newDiagram();
 		}
 
-		if(type == "diagram")
+		if(params.type == "diagram"){
 			svg.on("touchmove mousemove", moved);
-		else {
-			circles.call(d3.drag()
+			svg.selectAll("circle").transition().attr("r", 3);
+		}
+		else if(params.type == "drag and drop"){
+			svg.selectAll("circle").call(d3.drag()
 						.on("start", dragstarted)
 						.on("drag", dragged)
 						.on("end", dragended))
@@ -71,31 +72,28 @@ function typeShifted(type){
 	}
 }
 
-// resize function.............................................................
-function resized() {
-	var width = window.innerWidth,
-			height = window.innerHeight;
+function resize() {
+	var diagram,
+		width = window.innerWidth,
+		height = window.innerHeight;
 
-	svg
-		.attr("width", width)
+	svg	.attr("width", width)
 		.attr("height", height);
-
+	
 	voronoi = d3.voronoi()
 		.extent([[-1, -1], [width + 1, height + 1]]);
-
+	
 	sites = points
-		.map(function(d) { return [d[0] * width, d[1] * height]; });
+		.map(function(d) {return [d[0] * width, d[1] * height]; });
 
 	redraw();
 }
 
-// diagram function............................................................
 function moved() {
 	sites[0] = d3.mouse(this);
 	redraw();
 }
 
-// drag and drop functions.....................................................
 function dragstarted() {
 	d3.select(this).classed("active", true);
 }
@@ -125,205 +123,238 @@ function dragended() {
 	d3.select(this).classed("active", false);
 }
 
-// palette functions...........................................................
-function palleteShifted(hasShifted){
-	var theme, color;
-
-	if(hasShifted || defaultTheme == undefined){
-		theme = Math.floor(Math.random() * palette.length);
-		defaultTheme = theme;
-	}
-	else
-		theme = defaultTheme;
+function shiftPallete(hasShifted){
+	if(hasShifted)
+		theme = Math.round(Math.random() * palette.length);
 	
-	d3.selectAll("path").each(function() {
-		color = Math.floor(Math.random() * 5);
-		d3.select(this).transition().attr("fill", palette[theme][color]);
+	svg.select(".polygons").selectAll("path").each(function() {
+		d3.select(this).transition()
+			.attr("fill", palette[theme][Math.round(Math.random()*4)]);
 	});
 }
 
-// border functions............................................................
-function borderShifted() {
-	border = border < 2 ? border + 1 : 0;
-	line.curve(interpolateTypes[border]);
-
-	redraw();
+function shiftBorder() {
+	border = border < 3 ? border + 1 : 0;
+	line.curve(curveTypes[border]);
+	if(params.type != "trip")
+		redraw();
 }
 
-// movement functions..........................................................
-function sitesShifted() {
-	if(movementTimer){
-		movementTimer.stop();
-		movementTimer = null;
-	}
-	else {
-		movementTimer = d3.timer(function(elapsed){
-			var circles = svg.selectAll("circle");
-			sites = [];
+// draw functions..............................................................
 
-			circles.each(function() {
-				var circle = d3.select(this),				
-						cx = parseFloat(circle.attr("cx")),
-						cy = parseFloat(circle.attr("cy")),
-						speedx = parseFloat(circle.attr("speedx")),
-						speedy = parseFloat(circle.attr("speedy"));
-				
-				if(circle.attr("id") != "mouse" || params.type != "diagram"){
-					cx = cx + speedx;
-					cy = cy + speedy;
-					
-					if(cx <= 0 || cx >= svg.attr("width"))
-						circle.attr("speedx", -1*speedx);
-
-					if(cy <= 0 || cy >= svg.attr("height"))
-						circle.attr("speedy", -1*speedy);
-				}
-				
-				sites.push([cx, cy]);
-			});
-
-			redraw();
-		});
-	}
-}
-
-// redraw functions............................................................
-function newDiagram(hasNewColor){
+function newGoodTrip(){
 	var width = window.innerWidth,
-			height = window.innerHeight;
+		height = window.innerHeight,
+		lineTrip = d3.line().curve(d3.curveCardinalClosed);
 
-	svg.attr("width", width)
-		 .attr("height", height);
-
+	// initial dimensions
+	svg .attr("width", width)
+		.attr("height", height);
 	voronoi = d3.voronoi()
 		.extent([[-1, -1], [width + 1, height + 1]]);
 
-	svg.selectAll("*").remove();
+	// initial structure
+	svg.append("g").attr("class", "polygons");
+	svg.append("g").attr("class", "curves");
+	svg.append("g").attr("class", "sites");
 
+	// initial curves
+	newCurve(3, 2 + Math.floor(Math.random()*12));
+
+	// initial polygons
+	sites = svg.selectAll("circle").data();
+	polygonsDom = svg.select(".polygons")
+		.selectAll("path")
+		.data(voronoi.polygons(sites))
+		.enter().append("path")
+			.call(redrawPolygon);
+
+	// initial color
+	shiftPallete(false);
+
+	// redraw timer
+	timer = d3.timer(function(elapsed){
+		sites = []
+		svg.selectAll("circle").each(function(d, i){
+			var p = d3.select(this);
+			sites.push([Number(p.attr("cx")), Number(p.attr("cy"))])
+		});
+
+		var diagram = voronoi(sites);		
+		polygonsDom = polygonsDom.data(diagram.polygons()).call(redrawPolygon);
+
+		// if(elapsed > 200)
+		// 	timer.stop();
+	}, 200);
+
+	// curve generators and transition
+	function newCurve(pointsIn, pointsOn){
+		var sitesOn = [], pathLength;
+
+		// should be generalized........................... 
+		points = [];
+		while(points.length < pointsIn)
+			points.push([Math.random(), Math.random()]);
+		//^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+		sites = points
+			.map(function(d) {
+				return [d[0] * width, d[1] * height]; });
+		
+		var path = svg.select(".curves")
+			.append("path").data([sites])
+		.style("fill", "none")
+		.style("stroke", "grey")
+		.attr("d", lineTrip);
+
+		pathLength = path.node().getTotalLength();
+		while(sitesOn.length < pointsOn){
+			var d = (sitesOn.length/pointsOn) * pathLength,
+				p = path.node().getPointAtLength(d)
+			sitesOn.push([p.x, p.y]);
+		}
+
+		//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		// unique keys talvez seja uma solucao para que nao sobreponha
+		var site = svg.select(".sites")
+			.selectAll("circle")
+		.data(sitesOn)
+		.enter().append("circle")
+			.attr("r", 6)
+			.style("fill", "grey")
+			.each(function(d, i){
+				transition(path, d3.select(this), i/sitesOn.length);});
+		//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	}
+
+	function transition(path, site, t0) {
+		site.transition()
+			.duration(10000)
+			.ease(d3.easeLinear)
+			.attrTween("cx", translateAlong(path.node(), t0, true))
+			.attrTween("cy", translateAlong(path.node(), t0, false))
+			.on("end", function(){transition(path, site, t0);});
+	}
+
+	function translateAlong(path, t0, isX) {
+		var l = path.getTotalLength();
+		return function(d, i, a) {
+			return function(t) {
+				t = (t0 + t) < 1 ? (t0 + t) : (t0 + t - 1);
+				var p = path.getPointAtLength(t * l);
+				return isX ? p.x : p.y;
+			};
+		};
+	}
+}
+
+function newDiagram(){
+	// sets dimensions of svg
+	var width = window.innerWidth,
+		height = window.innerHeight;
+	svg
+		.attr("width", width)
+		.attr("height", height);
+	voronoi = d3.voronoi()
+		.extent([[-1, -1], [width + 1, height + 1]]);
+
+	// creates random initial points
 	points = d3.range(params.points)
 		.map(function(d) { return [Math.random(), Math.random()]; });
-
 	sites = points
 		.map(function(d) { return [d[0] * width, d[1] * height]; });
 
-	polygon = svg.append("g")
+	// appends the initial structure
+	polygonsDom = svg.append("g")
 		.attr("class", "polygons")
 	.selectAll("path")
-	.data(line(voronoi.polygons(sites)))
-	.enter().append("path");
-
-	link = svg.append("g")
+	.data(voronoi.polygons(sites))
+	.enter().append("path")
+	.call(redrawPolygon);
+	linksDom = svg.append("g")
 		.attr("class", "links")
 	.selectAll("line")
 	.data(voronoi.links(sites))
-	.enter().append("line");
-
-	site = svg.append("g")
+	.enter().append("line")
+	.call(redrawLink);
+	sitesDom = svg.append("g")
 		.attr("class", "sites")
 	.selectAll("circle")
 	.data(sites)
 	.enter().append("circle")
 		.attr("r", 3)
-		.each(function() {
-			d3.select(this)
-				.attr("speedx", 6*Math.random())
-				.attr("speedy", 6*Math.random());
-		});
+	.call(redrawSite);
 
-	svg.select("circle")
-		.attr("id", "diagramSite");
-	svg.select("path")
-		.attr("id", "diagramPolygon");
-
-	palleteShifted(hasNewColor);
-	redraw();
+	shiftPallete(false);
 }
 
-function newGoodTrip(){
-	var width = window.innerWidth,
-			height = window.innerHeight;
+function updateDiagram(){
+	var diagram, width, height;
 
-	svg.attr("width", width)
-		 .attr("height", height);
+	// update amount of points
+	while(points.length < params.points)
+		points.push([Math.random(), Math.random()]);
+	while(points.length > params.points)
+		points.pop();
 
+	// resize to new window
+	width = window.innerWidth;
+	height = window.innerHeight;
+	svg	.attr("width", width)
+		.attr("height", height);
 	voronoi = d3.voronoi()
 		.extent([[-1, -1], [width + 1, height + 1]]);
+	sites = points
+		.map(function(d) {return [d[0] * width, d[1] * height]; });
+	
+	// remove and merge new points
+	diagram = voronoi(sites);	
+	polygonsDom = svg.select(".polygons")
+	.selectAll("path")
+		.data(diagram.polygons());
+	polygonsDom.exit().remove();
+	polygonsDom.enter().append("path")
+		.merge(polygonsDom)
+		.call(redrawPolygon);
+	linksDom = svg.select(".links").selectAll("line")
+		.data(diagram.links());
+	linksDom.exit().remove();
+	linksDom.enter().append("line")
+		.merge(linksDom)
+		.call(redrawLink);
+	sitesDom = svg.select(".sites").selectAll("circle")
+		.data(sites);
+	sitesDom.exit().remove();
+	sitesDom.enter().append("circle")
+		.merge(sitesDom)
+		.call(redrawSite);
 
-	svg.selectAll("*").remove();
-
-	svg.append("g")
-		.attr("class", "polygons");
-	svg.append("g")
-		.attr("class", "links");
-	svg.append("g")
-		.attr("class", "sites");
-
-	ellipse(0.5, 0.5, 0.2, 0.4, 8, 0.02);
-
-	palleteShifted(true);
-	d3.timer(function(){
-
-		redraw();
-	});
-
-	// ellipse creation....................
-	function ellipse(cx, cy, a, b, n, δθ){
-		var newPoints = [];
-
-		d3.range(1e-6, 2 * Math.PI, 2 * Math.PI / n).map(function(θ, i) {
-			var point = [cx + Math.cos(θ) * a, cy + Math.sin(θ) * b];
-			newPoints.push(point);
-
-			d3.timer(function(elapsed){
-				var angle = θ + δθ * elapsed / 60;
-				point[0] = cx + Math.cos(angle) * a;
-				point[1] = cy + Math.sin(angle) * b;
-			});
-		});
-
-		sites = newPoints
-		 	.map(function(d) {return [d[0] * width, d[1] * height];});
-
-		polygon = svg.select(".polygons").selectAll("path")
-			.data(line(voronoi.polygons(sites)))
-			.enter().append("path");
-
-		link = svg.select(".links").selectAll("line")
-			.data(voronoi.links(sites))
-			.enter().append("line");
-
-		site = svg.select(".sites").selectAll("circle")
-			.data(sites)
-			.enter().append("circle")
-				.attr("r", 3);
-
-
-	}
+	shiftPallete(false);
+	shiftType();
 }
 
 function redraw() {
 	var diagram = voronoi(sites);
-	polygon = polygon.data(diagram.polygons()).call(redrawPolygon);
-	link = link.data(diagram.links()), link.exit().remove();
-	link = link.enter().append("line").merge(link).call(redrawLink);
-	site = site.data(sites).call(redrawSite);
+	polygonsDom = polygonsDom.data(diagram.polygons()).call(redrawPolygon);
+	linksDom = linksDom.data(diagram.links()), linksDom.exit().remove();
+	linksDom = linksDom.enter().append("line").merge(linksDom).call(redrawLink);		
+	sitesDom = sitesDom.data(sites).call(redrawSite);
 }
 
 function redrawPolygon(polygon){
-	polygon
-		.attr("d", function(points) {
-			var p0, p1 = points[0], resample = [];
+	polygon.attr("d", function(edges) {
+		var p0, p1 = edges[0], resample = [];
 
-			for(i = 1; i < points.length; i++){
-				p0 = p1;
-				p1 = points[i];
-				resample.push(p0,
-					[(p0[0] + p1[0])/2, (p0[1] + p1[1])/2]);
-			}
-			resample.push(p1);
+		for(i = 1; i < edges.length; i++){
+			p0 = p1;
+			p1 = edges[i];
+			resample.push(p0,
+				[(p0[0] + p1[0])/2, (p0[1] + p1[1])/2]);
+		}
+		resample.push(p1);
 
-			return line(resample);
-		});
+		return line(resample);
+	});
 }
 
 function redrawLink(link){
