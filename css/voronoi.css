@@ -20,12 +20,8 @@ body, html {
 }
 
 .sites {
-  fill: #fff;
+  fill: #FFF; 
   stroke: #fff;
-}
-
-.sites :first-child {
-  fill: #fff;
 }
 
 .active {
