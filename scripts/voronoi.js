@@ -24,7 +24,7 @@ typeGui.onFinishChange(shiftType);
 gui.add(params, "shiftColor");
 gui.add(params, "shiftBorder");
 
-newGoodTrip();
+shiftType();
 
 // event functions.............................................................
 
@@ -36,15 +36,21 @@ function shiftType(){
 			.on("end", null));
 
 	if(params.type == "trip"){
-		if(pointsGui){
+		if(pointsGui)
 			pointsGui.remove();
-			pointsGui = null;
-		}
 
-		svg.selectAll("*").remove();
+		// RESIZE FUNCTION DOESNT WORK YET.....................................
+		svg.on("touchmove mousemove", function(){
+			console.log([d3.mouse(this)[0]-svg.attr("width")/2,
+						d3.mouse(this)[1]-svg.attr("height")/2,]);});
+		// window.onresize = function(){
+		// 	console.log("PROBLEMA");
+		// 	newGoodTrip();
+		// };
+		//.....................................................................
+
 		window.onresize = null;
 		wasTrip = true;
-
 		newGoodTrip();
 	}
 	else {
@@ -52,7 +58,6 @@ function shiftType(){
 			pointsGui = gui.add(params, "points").min(2).max(42).step(1);
 			pointsGui.onChange(updateDiagram);
 			window.onresize = updateDiagram;
-			svg.selectAll("*").remove();
 			wasTrip = false;
 			timer.stop();
 			newDiagram();
@@ -143,6 +148,8 @@ function shiftBorder() {
 // draw functions..............................................................
 
 function newGoodTrip(){
+	svg.selectAll("*").remove();
+
 	var width = window.innerWidth,
 		height = window.innerHeight,
 		lineTrip = d3.line().curve(d3.curveCardinalClosed);
@@ -151,15 +158,16 @@ function newGoodTrip(){
 	svg .attr("width", width)
 		.attr("height", height);
 	voronoi = d3.voronoi()
-		.extent([[-1, -1], [width + 1, height + 1]]);
+		.extent([[-1, -1], [width+1, height+1]]);
 
 	// initial structure
 	svg.append("g").attr("class", "polygons");
 	svg.append("g").attr("class", "curves");
-	svg.append("g").attr("class", "sites");
+	svg.append("g").attr("class", "sites");	
 
-	// initial curves
-	newCurve(3, 2 + Math.floor(Math.random()*12));
+	// main trip
+	randomTrip(3, 2);
+	randomTrip(4, 3);
 
 	// initial polygons
 	sites = svg.selectAll("circle").data();
@@ -182,51 +190,63 @@ function newGoodTrip(){
 
 		var diagram = voronoi(sites);		
 		polygonsDom = polygonsDom.data(diagram.polygons()).call(redrawPolygon);
-
-		// if(elapsed > 200)
-		// 	timer.stop();
 	}, 200);
 
-	// curve generators and transition
-	function newCurve(pointsIn, pointsOn){
-		var sitesOn = [], pathLength;
+	// points generator
+	function klingemannTrip(){
+		var sitesIn, r, angle = 0.707,
+			cx = width/2, cy = height/2;
 
-		// should be generalized........................... 
-		points = [];
-		while(points.length < pointsIn)
-			points.push([Math.random(), Math.random()]);
-		//^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+		for(var i = 1; i < 3; i++){
+			r = 60 * i;
+			sitesIn = [
+				[cx, cy-r],
+				[cx-r*angle, cy+r*angle],
+				[cx+r*angle, cy+r*angle]];
+			newCurve(3, sitesIn, 2);
+		}
+	}
 
-		sites = points
-			.map(function(d) {
-				return [d[0] * width, d[1] * height]; });
-		
+	function randomTrip(pointsIn, pointsOn){
+		var sitesIn = [];
+		while(sitesIn.length < pointsIn)
+			sitesIn.push([Math.random()*width, Math.random()*height]);
+		newCurve(pointsIn, sitesIn, pointsOn);
+	}
+
+	// curve generator
+	function newCurve(pointsIn, sitesIn, pointsOn){
+		// create the path for movement
 		var path = svg.select(".curves")
-			.append("path").data([sites])
+			.append("path").data([sitesIn])
 		.style("fill", "none")
 		.style("stroke", "grey")
 		.attr("d", lineTrip);
 
-		pathLength = path.node().getTotalLength();
-		while(sitesOn.length < pointsOn){
-			var d = (sitesOn.length/pointsOn) * pathLength,
-				p = path.node().getPointAtLength(d)
+		// merging old and new sites
+		var sitesOn = svg.selectAll("circle").data();
+		var pathLength = path.node().getTotalLength();
+		for(var i = 0; i < pointsOn; i++){
+			var d = (i/pointsOn) * pathLength,
+				p = path.node().getPointAtLength(d);
 			sitesOn.push([p.x, p.y]);
 		}
 
-		//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		// unique keys talvez seja uma solucao para que nao sobreponha
+		// GAP BETWEEN POINTS IS WEIRD.........................................
+		var length = sitesOn.length;
 		var site = svg.select(".sites")
 			.selectAll("circle")
 		.data(sitesOn)
 		.enter().append("circle")
 			.attr("r", 6)
 			.style("fill", "grey")
+			.style("stroke", "grey")
 			.each(function(d, i){
-				transition(path, d3.select(this), i/sitesOn.length);});
-		//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+				transition(path, d3.select(this), i/length);});
+		//.....................................................................
 	}
 
+	// transition event
 	function transition(path, site, t0) {
 		site.transition()
 			.duration(10000)
@@ -249,6 +269,8 @@ function newGoodTrip(){
 }
 
 function newDiagram(){
+	svg.selectAll("*").remove();
+
 	// sets dimensions of svg
 	var width = window.innerWidth,
 		height = window.innerHeight;
