@@ -23,6 +23,8 @@ typeGui = gui.add(params, "type", ["trip", "diagram", "drag and drop"]);
 typeGui.onFinishChange(shiftType);
 gui.add(params, "shiftColor");
 gui.add(params, "shiftBorder");
+pointsGui = gui.add(params, "points").min(2).max(42).step(1);
+pointsGui.onChange(updateDiagram);
 
 shiftType();
 
@@ -36,22 +38,20 @@ function shiftType(){
 			.on("end", null));
 
 	if(params.type == "trip"){
-		if(pointsGui)
-			pointsGui.remove();
+		pointsGui.remove();
 
-		// RESIZE FUNCTION DOESNT WORK YET.....................................
+		window.onresize = function(){
+			timer.stop();
+			newGoodTrip()};
+
+		wasTrip = true;
+		newGoodTrip();
+
+		// FOR DEBUG PURPOSES........................................
 		svg.on("touchmove mousemove", function(){
 			console.log([d3.mouse(this)[0]-svg.attr("width")/2,
 						d3.mouse(this)[1]-svg.attr("height")/2,]);});
-		// window.onresize = function(){
-		// 	console.log("PROBLEMA");
-		// 	newGoodTrip();
-		// };
-		//.....................................................................
-
-		window.onresize = null;
-		wasTrip = true;
-		newGoodTrip();
+		// END MANUAL DEBUG..........................................
 	}
 	else {
 		if(wasTrip){
@@ -188,7 +188,7 @@ function newGoodTrip(){
 			sites.push([Number(p.attr("cx")), Number(p.attr("cy"))])
 		});
 
-		var diagram = voronoi(sites);		
+		var diagram = voronoi(sites);
 		polygonsDom = polygonsDom.data(diagram.polygons()).call(redrawPolygon);
 	}, 200);
 
@@ -225,6 +225,7 @@ function newGoodTrip(){
 
 		// merging old and new sites
 		var sitesOn = svg.selectAll("circle").data();
+		var oldPoints = sitesOn.length;
 		var pathLength = path.node().getTotalLength();
 		for(var i = 0; i < pointsOn; i++){
 			var d = (i/pointsOn) * pathLength,
@@ -232,8 +233,7 @@ function newGoodTrip(){
 			sitesOn.push([p.x, p.y]);
 		}
 
-		// GAP BETWEEN POINTS IS WEIRD.........................................
-		var length = sitesOn.length;
+		// creates new curve and movement
 		var site = svg.select(".sites")
 			.selectAll("circle")
 		.data(sitesOn)
@@ -242,8 +242,8 @@ function newGoodTrip(){
 			.style("fill", "grey")
 			.style("stroke", "grey")
 			.each(function(d, i){
-				transition(path, d3.select(this), i/length);});
-		//.....................................................................
+				transition(path, d3.select(this), (i-oldPoints)/pointsOn);
+			});
 	}
 
 	// transition event
