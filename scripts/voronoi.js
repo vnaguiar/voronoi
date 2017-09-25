@@ -166,8 +166,7 @@ function newGoodTrip(){
 	svg.append("g").attr("class", "sites");	
 
 	// main trip
-	randomTrip(3, 2);
-	randomTrip(4, 3);
+	klingemannTrip(3, 2);
 
 	// initial polygons
 	sites = svg.selectAll("circle").data();
@@ -197,13 +196,13 @@ function newGoodTrip(){
 		var sitesIn, r, angle = 0.707,
 			cx = width/2, cy = height/2;
 
-		for(var i = 1; i < 3; i++){
+		for(var i = 1; i < 5; i++){
 			r = 60 * i;
 			sitesIn = [
 				[cx, cy-r],
 				[cx-r*angle, cy+r*angle],
 				[cx+r*angle, cy+r*angle]];
-			newCurve(3, sitesIn, 2);
+			newCurve(3, sitesIn, 4);
 		}
 	}
 
