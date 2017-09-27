@@ -5,11 +5,12 @@ var gui = new dat.GUI(),
 		points: 4,
 		type: "trip",
 		shiftBorder: shiftBorder,
-		shiftColor: function() {shiftPallete(true);}
+		shiftColor: function() {shiftColor(true);}
 	};
 
 var svg = d3.select("svg"), voronoi, points, sites, polygonsDom, 
 	linksDom, sitesDom, border = 0, theme = 0, wasTrip = true, timer,
+	firstTime = 1, sitesIn,
 
 	line = d3.line()
 		.x(function(d) { return d[0]; })
@@ -20,46 +21,50 @@ var svg = d3.select("svg"), voronoi, points, sites, polygonsDom,
 		 d3.curveCardinalClosed, d3.curveCatmullRomClosed];
 
 typeGui = gui.add(params, "type", ["trip", "diagram", "drag and drop"]);
-typeGui.onFinishChange(shiftType);
 gui.add(params, "shiftColor");
 gui.add(params, "shiftBorder");
 pointsGui = gui.add(params, "points").min(2).max(42).step(1);
-pointsGui.onChange(updateDiagram);
+
+typeGui.onFinishChange(shiftType);
 
 shiftType();
 
-// event functions.............................................................
+// control flow of different modes.............................................
 
 function shiftType(){
-	svg.on("touchmove mousemove", null);
+	// clear previous event listeners
 	svg.selectAll("circle").call(d3.drag()
-			.on("start", null)
-			.on("drag", null)
-			.on("end", null));
+		.on("start", null)
+		.on("drag", null)
+		.on("end", null));
+	svg.on("touchmove mousemove", null);
+	svg.on("oncontextmenu", null);
+	svg.on("onclick", null);
 
+	// control flow
 	if(params.type == "trip"){
-		pointsGui.remove();
+		svg.selectAll("*").remove();
+		pointsGui.onChange(null);
 
 		window.onresize = function(){
-			timer.stop();
-			newGoodTrip()};
+			svg.selectAll("*").remove();
+			if(timer)
+				timer.stop();
+			newTrip();
+		};
 
 		wasTrip = true;
-		newGoodTrip();
-
-		// FOR DEBUG PURPOSES........................................
-		svg.on("touchmove mousemove", function(){
-			console.log([d3.mouse(this)[0]-svg.attr("width")/2,
-						d3.mouse(this)[1]-svg.attr("height")/2,]);});
-		// END MANUAL DEBUG..........................................
+		newTrip();
 	}
 	else {
 		if(wasTrip){
-			pointsGui = gui.add(params, "points").min(2).max(42).step(1);
+			svg.selectAll("*").remove();
+			timer.stop();
+
+			wasTrip = false;
+
 			pointsGui.onChange(updateDiagram);
 			window.onresize = updateDiagram;
-			wasTrip = false;
-			timer.stop();
 			newDiagram();
 		}
 
@@ -67,37 +72,39 @@ function shiftType(){
 			svg.on("touchmove mousemove", moved);
 			svg.selectAll("circle").transition().attr("r", 3);
 		}
-		else if(params.type == "drag and drop"){
+		else if(params.type == "drag and drop")
 			svg.selectAll("circle").call(d3.drag()
-						.on("start", dragstarted)
-						.on("drag", dragged)
-						.on("end", dragended))
-						.transition().attr("r", 10);
-		}
+				.on("start", dragstarted)
+				.on("drag", dragged)
+				.on("end", dragended))
+				.transition().attr("r", 10);
 	}
 }
 
-function resize() {
-	var diagram,
-		width = window.innerWidth,
-		height = window.innerHeight;
-
-	svg	.attr("width", width)
-		.attr("height", height);
+function shiftColor(hasShifted){
+	if(hasShifted)
+		theme = Math.round(Math.random() * palette.length);
 	
-	voronoi = d3.voronoi()
-		.extent([[-1, -1], [width + 1, height + 1]]);
-	
-	sites = points
-		.map(function(d) {return [d[0] * width, d[1] * height]; });
-
-	redraw();
+	svg.select(".polygons").selectAll("path").each(function() {
+		d3.select(this).transition()
+			.attr("fill", palette[theme][Math.round(Math.random()*4)]);});
 }
+
+function shiftBorder() {
+	border = border < 3 ? border + 1 : 0;
+	line.curve(curveTypes[border]);
+	if(params.type != "trip")
+		redraw();
+}
+
+// diagram functions...........................................................
 
 function moved() {
 	sites[0] = d3.mouse(this);
 	redraw();
 }
+
+// drag and drop functions.....................................................
 
 function dragstarted() {
 	d3.select(this).classed("active", true);
@@ -128,31 +135,11 @@ function dragended() {
 	d3.select(this).classed("active", false);
 }
 
-function shiftPallete(hasShifted){
-	if(hasShifted)
-		theme = Math.round(Math.random() * palette.length);
-	
-	svg.select(".polygons").selectAll("path").each(function() {
-		d3.select(this).transition()
-			.attr("fill", palette[theme][Math.round(Math.random()*4)]);
-	});
-}
+// trip draw functions.........................................................
 
-function shiftBorder() {
-	border = border < 3 ? border + 1 : 0;
-	line.curve(curveTypes[border]);
-	if(params.type != "trip")
-		redraw();
-}
-
-// draw functions..............................................................
-
-function newGoodTrip(){
-	svg.selectAll("*").remove();
-
+function newTrip(){
 	var width = window.innerWidth,
-		height = window.innerHeight,
-		lineTrip = d3.line().curve(d3.curveCardinalClosed);
+		height = window.innerHeight;
 
 	// initial dimensions
 	svg .attr("width", width)
@@ -165,8 +152,55 @@ function newGoodTrip(){
 	svg.append("g").attr("class", "curves");
 	svg.append("g").attr("class", "sites");	
 
-	// main trip
-	klingemannTrip(3, 2);
+	// event listeners
+	sitesIn = [];
+	svg.on("click", clickTrip);
+	svg.on("contextmenu", contextmenuTrip);
+
+	// timer call
+	timerTrip();
+}
+
+function clickTrip(){
+	sitesIn.push(d3.mouse(this));
+}
+
+function contextmenuTrip(){
+	var lineTrip = d3.line().curve(d3.curveCardinalClosed);
+
+    d3.event.preventDefault();
+	timer.stop();
+
+    if(sitesIn.length < 3)
+    	return;
+
+	// creates the path for movement
+	var path = svg.select(".curves")
+		.append("path").data([sitesIn])
+			.style("fill", "none")
+			.style("stroke", "grey")
+			.attr("d", lineTrip);
+
+	// merges old and new sites
+	var sitesOn = svg.selectAll("circle").data(),
+		oldPoints = sitesOn.length,
+		pathLength = path.node().getTotalLength();
+	for(var i = 0; i < params.points; i++){
+		var d = (i/params.points) * pathLength,
+			p = path.node().getPointAtLength(d);
+		sitesOn.push([p.x, p.y]);
+	}
+
+	// creates new circles and movement
+	var site = svg.select(".sites")
+		.selectAll("circle")
+	.data(sitesOn)
+	.enter().append("circle")
+		.attr("r", 3)
+		.style("fill", "grey")
+		.style("stroke", "grey")
+		.each(function(d, i){
+			transition(path, d3.select(this), (i-oldPoints)/params.points);});
 
 	// initial polygons
 	sites = svg.selectAll("circle").data();
@@ -177,102 +211,57 @@ function newGoodTrip(){
 			.call(redrawPolygon);
 
 	// initial color
-	shiftPallete(false);
+	shiftColor(false);
+	sitesIn = [];
+	timerTrip();
+}
 
-	// redraw timer
+function transition(path, site, t0) {
+	site.transition()
+		.duration(10000)
+		.ease(d3.easeLinear)
+		.attrTween("cx", translateAlong(path.node(), t0, true))
+		.attrTween("cy", translateAlong(path.node(), t0, false))
+		.on("end", function(){transition(path, site, t0);});
+}
+
+function translateAlong(path, t0, isX) {
+	var l = path.getTotalLength();
+	return function(d, i, a) {
+		return function(t) {
+			t = (t0 + t) < 1 ? (t0 + t) : (t0 + t - 1);
+			var p = path.getPointAtLength(t * l);
+			return isX ? p.x : p.y;
+		};
+	};
+}
+
+function timerTrip(){
 	timer = d3.timer(function(elapsed){
+		var diagram;
+
 		sites = []
 		svg.selectAll("circle").each(function(d, i){
 			var p = d3.select(this);
 			sites.push([Number(p.attr("cx")), Number(p.attr("cy"))])
 		});
 
-		var diagram = voronoi(sites);
+		if(!sites.length)
+			return;
+
+		diagram = voronoi(sites);
+		polygonsDom = svg.select(".polygons").selectAll("path");
 		polygonsDom = polygonsDom.data(diagram.polygons()).call(redrawPolygon);
 	}, 200);
-
-	// points generator
-	function klingemannTrip(){
-		var sitesIn, r, angle = 0.707,
-			cx = width/2, cy = height/2;
-
-		for(var i = 1; i < 5; i++){
-			r = 60 * i;
-			sitesIn = [
-				[cx, cy-r],
-				[cx-r*angle, cy+r*angle],
-				[cx+r*angle, cy+r*angle]];
-			newCurve(3, sitesIn, 4);
-		}
-	}
-
-	function randomTrip(pointsIn, pointsOn){
-		var sitesIn = [];
-		while(sitesIn.length < pointsIn)
-			sitesIn.push([Math.random()*width, Math.random()*height]);
-		newCurve(pointsIn, sitesIn, pointsOn);
-	}
-
-	// curve generator
-	function newCurve(pointsIn, sitesIn, pointsOn){
-		// create the path for movement
-		var path = svg.select(".curves")
-			.append("path").data([sitesIn])
-		.style("fill", "none")
-		.style("stroke", "grey")
-		.attr("d", lineTrip);
-
-		// merging old and new sites
-		var sitesOn = svg.selectAll("circle").data();
-		var oldPoints = sitesOn.length;
-		var pathLength = path.node().getTotalLength();
-		for(var i = 0; i < pointsOn; i++){
-			var d = (i/pointsOn) * pathLength,
-				p = path.node().getPointAtLength(d);
-			sitesOn.push([p.x, p.y]);
-		}
-
-		// creates new curve and movement
-		var site = svg.select(".sites")
-			.selectAll("circle")
-		.data(sitesOn)
-		.enter().append("circle")
-			.attr("r", 6)
-			.style("fill", "grey")
-			.style("stroke", "grey")
-			.each(function(d, i){
-				transition(path, d3.select(this), (i-oldPoints)/pointsOn);
-			});
-	}
-
-	// transition event
-	function transition(path, site, t0) {
-		site.transition()
-			.duration(10000)
-			.ease(d3.easeLinear)
-			.attrTween("cx", translateAlong(path.node(), t0, true))
-			.attrTween("cy", translateAlong(path.node(), t0, false))
-			.on("end", function(){transition(path, site, t0);});
-	}
-
-	function translateAlong(path, t0, isX) {
-		var l = path.getTotalLength();
-		return function(d, i, a) {
-			return function(t) {
-				t = (t0 + t) < 1 ? (t0 + t) : (t0 + t - 1);
-				var p = path.getPointAtLength(t * l);
-				return isX ? p.x : p.y;
-			};
-		};
-	}
 }
 
-function newDiagram(){
-	svg.selectAll("*").remove();
+// diagram and drag and drop draw functions....................................
 
-	// sets dimensions of svg
+function newDiagram(){
 	var width = window.innerWidth,
 		height = window.innerHeight;
+
+	// sets dimensions of svg
 	svg
 		.attr("width", width)
 		.attr("height", height);
@@ -306,7 +295,7 @@ function newDiagram(){
 		.attr("r", 3)
 	.call(redrawSite);
 
-	shiftPallete(false);
+	shiftColor(false);
 }
 
 function updateDiagram(){
@@ -350,7 +339,7 @@ function updateDiagram(){
 		.merge(sitesDom)
 		.call(redrawSite);
 
-	shiftPallete(false);
+	shiftColor(false);
 	shiftType();
 }
 
