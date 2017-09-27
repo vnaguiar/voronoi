@@ -1,16 +1,16 @@
 // global variables, event listeners and initial state.........................
 
-var gui = new dat.GUI(),
-	typeGui, pointsGui, params = {
+var gui = new dat.GUI(), typeGui, 
+	pointsGui, canvasGui, params = {
 		points: 4,
 		type: "trip",
+		clearCanvas: clearCanvas,
 		shiftBorder: shiftBorder,
 		shiftColor: function() {shiftColor(true);}
 	};
 
 var svg = d3.select("svg"), voronoi, points, sites, polygonsDom, 
-	linksDom, sitesDom, border = 0, theme = 0, wasTrip = true, timer,
-	firstTime = 1, sitesIn,
+	linksDom, sitesDom, border = 0, theme = 0, wasTrip = true, timer, sitesIn,
 
 	line = d3.line()
 		.x(function(d) { return d[0]; })
@@ -21,9 +21,9 @@ var svg = d3.select("svg"), voronoi, points, sites, polygonsDom,
 		 d3.curveCardinalClosed, d3.curveCatmullRomClosed];
 
 typeGui = gui.add(params, "type", ["trip", "diagram", "drag and drop"]);
+pointsGui = gui.add(params, "points").min(2).max(42).step(1);
 gui.add(params, "shiftColor");
 gui.add(params, "shiftBorder");
-pointsGui = gui.add(params, "points").min(2).max(42).step(1);
 
 typeGui.onFinishChange(shiftType);
 
@@ -46,25 +46,21 @@ function shiftType(){
 		svg.selectAll("*").remove();
 		pointsGui.onChange(null);
 
-		window.onresize = function(){
-			svg.selectAll("*").remove();
-			if(timer)
-				timer.stop();
-			newTrip();
-		};
-
+		canvasGui = gui.add(params, "clearCanvas");
+		window.onresize = resize;
 		wasTrip = true;
 		newTrip();
 	}
 	else {
 		if(wasTrip){
 			svg.selectAll("*").remove();
+			canvasGui.remove();
 			timer.stop();
 
 			wasTrip = false;
 
 			pointsGui.onChange(updateDiagram);
-			window.onresize = updateDiagram;
+			window.onresize = resize;
 			newDiagram();
 		}
 
@@ -97,7 +93,22 @@ function shiftBorder() {
 		redraw();
 }
 
-// diagram functions...........................................................
+function clearCanvas(){
+	timer.stop();
+	svg.selectAll("*").remove();
+	newTrip();
+}
+
+function resize() {
+	var width = window.innerWidth,
+		height = window.innerHeight;
+	svg .attr("width", width)
+		.attr("height", height);
+	voronoi = d3.voronoi()
+		.extent([[-1, -1], [width+1, height+1]]);
+}
+
+// diagram function............................................................
 
 function moved() {
 	sites[0] = d3.mouse(this);
@@ -342,6 +353,8 @@ function updateDiagram(){
 	shiftColor(false);
 	shiftType();
 }
+
+// base draw functions.........................................................
 
 function redraw() {
 	var diagram = voronoi(sites);
