@@ -16,18 +16,21 @@ var svg = d3.select("svg"), voronoi, points, sites, polygonsDom,
 		.x(function(d) { return d[0]; })
 		.y(function(d) { return d[1]; }),
 
+	lineTrip = d3.line().curve(d3.curveLinearClosed),
+	
 	curveTypes = 
-		[d3.curveLinear, d3.curveBasisClosed,
+		[d3.curveLinearClosed, d3.curveBasisClosed,
 		 d3.curveCardinalClosed, d3.curveCatmullRomClosed];
 
 typeGui = gui.add(params, "type", ["trip", "diagram", "drag and drop"]);
 pointsGui = gui.add(params, "points").min(2).max(42).step(1);
+typeGui.onFinishChange(shiftType);
 gui.add(params, "shiftColor");
 gui.add(params, "shiftBorder");
-
-typeGui.onFinishChange(shiftType);
+gui.close();
 
 shiftType();
+initialTrip();
 
 // control flow of different modes.............................................
 
@@ -152,13 +155,13 @@ function newTrip(){
 	var width = window.innerWidth,
 		height = window.innerHeight;
 
-	// initial dimensions
+	// dimensions
 	svg .attr("width", width)
 		.attr("height", height);
 	voronoi = d3.voronoi()
 		.extent([[-1, -1], [width+1, height+1]]);
 
-	// initial structure
+	// structure
 	svg.append("g").attr("class", "polygons");
 	svg.append("g").attr("class", "curves");
 	svg.append("g").attr("class", "sites");	
@@ -177,27 +180,30 @@ function clickTrip(){
 }
 
 function contextmenuTrip(){
-	var lineTrip = d3.line().curve(d3.curveCardinalClosed);
+	lineTrip = d3.line().curve(d3.curveCardinalClosed);
+	d3.event.preventDefault();
+    if(sitesIn.length > 2)
+    	newAnimatedPath();
+}
 
-    d3.event.preventDefault();
-	timer.stop();
-
-    if(sitesIn.length < 3)
-    	return;
+function newAnimatedPath(pointsOn=0){
+    timer.stop();
+    if(!pointsOn)
+    	pointsOn = params.points;
 
 	// creates the path for movement
 	var path = svg.select(".curves")
 		.append("path").data([sitesIn])
 			.style("fill", "none")
-			.style("stroke", "grey")
+			// .style("stroke", "grey") //for debug purposes
 			.attr("d", lineTrip);
 
 	// merges old and new sites
 	var sitesOn = svg.selectAll("circle").data(),
 		oldPoints = sitesOn.length,
 		pathLength = path.node().getTotalLength();
-	for(var i = 0; i < params.points; i++){
-		var d = (i/params.points) * pathLength,
+	for(var i = 0; i < pointsOn; i++){
+		var d = (i/pointsOn) * pathLength,
 			p = path.node().getPointAtLength(d);
 		sitesOn.push([p.x, p.y]);
 	}
@@ -207,11 +213,11 @@ function contextmenuTrip(){
 		.selectAll("circle")
 	.data(sitesOn)
 	.enter().append("circle")
-		.attr("r", 3)
-		.style("fill", "grey")
-		.style("stroke", "grey")
+		.attr("r", 1)
+		.style("fill", "none") //for debug purposes
+		.style("stroke", "none") //for debug purposes
 		.each(function(d, i){
-			transition(path, d3.select(this), (i-oldPoints)/params.points);});
+			transition(path, d3.select(this), (i-oldPoints)/pointsOn);});
 
 	// initial polygons
 	sites = svg.selectAll("circle").data();
@@ -264,6 +270,23 @@ function timerTrip(){
 		polygonsDom = svg.select(".polygons").selectAll("path");
 		polygonsDom = polygonsDom.data(diagram.polygons()).call(redrawPolygon);
 	}, 200);
+}
+
+function initialTrip(){
+	var i = 1, j = 1, gap = 2,
+		w = window.innerWidth/10,
+		h = window.innerHeight/10;
+
+	sitesIn = [];
+	for(var i = 0.4; i < 10; i+=2){
+		sitesIn = sitesIn.concat(newLine(0.6*w, 9.6*w, i*h));
+		sitesIn = sitesIn.concat(newLine(9.6*w, 0.6*w, (i+1)*h));
+	}
+
+	newAnimatedPath(Math.floor(17 + 100 * Math.random()));
+
+	function newLine(start, end, height){
+		return [[start, height], [end, height]];}
 }
 
 // diagram and drag and drop draw functions....................................
