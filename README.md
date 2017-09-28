@@ -1,9 +1,14 @@
-# voronoi
+## voronoi
 just a little experiment using D3 Voronoi and dat.GUI to understand how to handle these libraries, it was not meant to be original. entirely based on the follow experiments:
 - [Mike Bostock - Rotating Voronoi](https://bl.ocks.org/mbostock/4636377)
 - [Mike Bostock - Voronoi Tesselation](https://bl.ocks.org/mbostock/4060366)
 - [Mike Bostock - Circle Dragging IV](https://bl.ocks.org/mbostock/ec10387f24c1fad2acac3bc11eb218a5)
 - [Mario Klingemann - Ornament in a Box](https://www.flickr.com/photos/quasimondo/8254540763/)
+
+## instructions
+- one left-click creates a point
+- one right-click creates a path (three points needed)
+- points bar controls how much equidistant points the path will have
 
 ## references
 - [D3 Voronoi](https://github.com/d3/d3-voronoi)
